@@ -1,0 +1,25 @@
+Method,Feature,Chi2,p_value,Significant_difference
+GAN (filtered),Sex,3.8537,0.049637,Yes
+GAN (filtered),Drug,5.8813,0.015302,Yes
+GAN (filtered),Ascites,146.1223,0.0,Yes
+GAN (filtered),Hepatomegaly,18.6388,1.6e-05,Yes
+GAN (filtered),Spiders,2.1157,0.145799,No
+GAN (filtered),Edema,9.3548,0.009303,Yes
+GAN (filtered),Stage,37.3549,0.0,Yes
+GAN (filtered),Status,33.0067,0.0,Yes
+CTGAN (filtered),Sex,34.6207,0.0,Yes
+CTGAN (filtered),Drug,0.1133,0.736373,No
+CTGAN (filtered),Ascites,134.2422,0.0,Yes
+CTGAN (filtered),Hepatomegaly,4.3178,0.037716,Yes
+CTGAN (filtered),Spiders,4.9567,0.02599,Yes
+CTGAN (filtered),Edema,5.3731,0.068117,No
+CTGAN (filtered),Stage,17.1446,0.00066,Yes
+CTGAN (filtered),Status,41.3203,0.0,Yes
+TVAE (filtered),Drug,14.8379,0.000117,Yes
+TVAE (filtered),Hepatomegaly,0.8229,0.364321,No
+TVAE (filtered),Spiders,380.2083,0.0,Yes
+TVAE (filtered),Status,55.99,0.0,Yes
+Consensus,Drug,10.317,0.001318,Yes
+Consensus,Hepatomegaly,6.5732,0.010353,Yes
+Consensus,Spiders,120.542,0.0,Yes
+Consensus,Stage,157.2036,0.0,Yes

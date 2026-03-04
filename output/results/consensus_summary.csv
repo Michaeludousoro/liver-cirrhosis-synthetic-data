@@ -1,0 +1,4 @@
+Source,Count,Percentage
+GAN,137,17.5
+CTGAN,161,20.6
+TVAE,484,61.9

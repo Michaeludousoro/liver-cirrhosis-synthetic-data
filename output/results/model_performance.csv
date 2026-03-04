@@ -1,0 +1,10 @@
+Scenario,Classifier,n_train,Accuracy,F1,Precision,Recall,AUC
+A: Baseline (real data only),Random Forest,193,0.7831,0.7848,0.7901,0.7831,0.8479
+A: Baseline (real data only),Gradient Boosting,193,0.7831,0.7852,0.7955,0.7831,0.8776
+A: Baseline (real data only),Logistic Regression,193,0.7711,0.7735,0.794,0.7711,0.8291
+B: Real data plus filtered CTGAN,Random Forest,403,0.759,0.7616,0.7782,0.759,0.8418
+B: Real data plus filtered CTGAN,Gradient Boosting,403,0.759,0.7616,0.7782,0.759,0.8721
+B: Real data plus filtered CTGAN,Logistic Regression,403,0.759,0.7616,0.7782,0.759,0.8455
+C: Real data plus consensus synthetic,Random Forest,975,0.7831,0.7841,0.786,0.7831,0.8539
+C: Real data plus consensus synthetic,Gradient Boosting,975,0.7349,0.7377,0.7617,0.7349,0.8321
+C: Real data plus consensus synthetic,Logistic Regression,975,0.7711,0.7731,0.7807,0.7711,0.8552

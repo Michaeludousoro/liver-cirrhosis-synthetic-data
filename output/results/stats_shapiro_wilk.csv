@@ -1,0 +1,12 @@
+Feature,W_statistic,p_value,Normal
+N_Days,0.9718,0.000628,No
+Age,0.9907,0.251068,Yes
+Bilirubin,0.6361,0.0,No
+Cholesterol,0.6762,0.0,No
+Albumin,0.9899,0.194078,Yes
+Copper,0.7683,0.0,No
+Alk_Phos,0.5909,0.0,No
+SGOT,0.9482,2e-06,No
+Tryglicerides,0.7989,0.0,No
+Platelets,0.9873,0.082422,Yes
+Prothrombin,0.8773,0.0,No
