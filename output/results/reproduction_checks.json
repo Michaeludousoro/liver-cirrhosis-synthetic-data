@@ -1,0 +1,73 @@
+{
+  "model_performance": {
+    "matched_rows": 12,
+    "metrics": [
+      "n_train",
+      "Accuracy",
+      "F1",
+      "Precision",
+      "Recall",
+      "AUC"
+    ],
+    "exact_to_saved_precision": true
+  },
+  "smote_results": {
+    "matched_rows": 3,
+    "metrics": [
+      "n_train",
+      "Accuracy",
+      "F1",
+      "Precision",
+      "Recall",
+      "AUC"
+    ],
+    "exact_to_saved_precision": true
+  },
+  "scenario_e_six_generators": {
+    "matched_rows": 18,
+    "metrics": [
+      "n_train",
+      "Accuracy",
+      "F1",
+      "Precision",
+      "Recall",
+      "AUC"
+    ],
+    "exact_to_saved_precision": true
+  },
+  "fold_isolation": {
+    "all_five_folds_pass": true,
+    "folds": [
+      {
+        "fold": 1,
+        "real_training_n": 154,
+        "validation_n": 39,
+        "consensus_n": 744
+      },
+      {
+        "fold": 2,
+        "real_training_n": 154,
+        "validation_n": 39,
+        "consensus_n": 740
+      },
+      {
+        "fold": 3,
+        "real_training_n": 154,
+        "validation_n": 39,
+        "consensus_n": 734
+      },
+      {
+        "fold": 4,
+        "real_training_n": 155,
+        "validation_n": 38,
+        "consensus_n": 831
+      },
+      {
+        "fold": 5,
+        "real_training_n": 155,
+        "validation_n": 38,
+        "consensus_n": 718
+      }
+    ]
+  }
+}

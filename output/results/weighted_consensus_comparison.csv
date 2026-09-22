@@ -1,0 +1,5 @@
+Approach,Records,GAN%,CTGAN%,TVAE%,Deceased%,FID
+"1. Flat vote (tolerance 5.0, current paper)",953,25.1,22.6,52.4,24.7,0.095
+"2. Weighted vote (tol 5.0, wt-thr 0.5)",953,25.1,22.6,52.4,24.7,0.095
+"3. Weighted vote (tol 5.0, wt-thr 0.6)",738,32.4,0.0,67.6,23.8,0.1204
+"4. Weighted vote (tol 5.0, wt-thr 0.6, TVAE=210)",480,56.2,0.0,43.8,26.2,0.0942

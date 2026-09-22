@@ -1,0 +1,582 @@
+\section{Introduction}
+
+\rev{Clinical prediction models require representative patient data, yet small cohorts and incomplete measurements can limit their development and evaluation. Liver cirrhosis provides a relevant setting: previous studies have examined mortality prediction and cirrhosis identification using electronic health records \cite{guo2021,obeid2023,kanwal2020}. The Mayo Clinic primary biliary cirrhosis (PBC) dataset contains 418 patients, but only 276 have complete measurements \cite{fleming1991,ucipbc}. This reduction motivates methods that can use limited clinical information more effectively.}
+
+\rev{Synthetic data generation learns patterns from observed records and samples new records from the fitted model. GANs and VAEs offer flexible approaches to this task \cite{goncalves2020,gonzales2023,yan2022,nikolentzos2023}. Their outputs may support model development when access to real records is constrained, but synthetic origin alone establishes neither anonymity nor clinical validity. Data quality must therefore be evaluated in relation to the intended use.}
+
+\rev{Two questions are distinct: whether synthetic records resemble a source cohort, and whether they improve prediction for unseen real patients. A third question concerns the potential disclosure of information about training patients. Research on synthesis quality in the \textit{Journal of Data and Information Quality} advocates a structured evaluation of multiple quality dimensions \cite{stenger2024}. In \textit{ACM Transactions on Computing for Healthcare}, Mamun et al.\ use CTGAN augmentation and sample filtering within a neonatal prediction framework \cite{mamun2026}. These studies motivate examining how quality controls relate to downstream clinical tasks; neither establishes that the same controls will improve prediction in a small PBC cohort.}
+
+\rev{This study tests whether statistical outlier filtering and cross-architecture consensus improve the predictive value of synthetic PBC records. A fixed split allocates 193 complete cases to training and 83 to held-out testing. Three core generators---Vanilla GAN, cGAN, and VAE---are evaluated individually and through consensus filtering. A masked-loss VAE, CTGAN implementation, and SMOTE provide complementary comparisons. The PBC data comprise baseline clinical measurements with follow-up outcomes, not wearable sensor streams. Consequently, connected-health and Internet of Medical Things (IoMT) applications motivate possible future use but are not evaluated deployments.}
+
+\rev{The study makes four contributions:}
+\begingroup
+\begin{enumerate}
+\revisioncolor
+\item A comparison of five generative models and one consensus-derived dataset, with explicit separation of augmentation and synthetic-only training.
+\item A reproducible quality-control procedure combining training-derived Tukey fences with nearest-neighbour agreement across three generator architectures.
+\item Joint evaluation of distributional fidelity, empirical near-duplicate rates, and predictive performance on held-out real patients.
+\item Sensitivity analyses using three-year outcome classification, time-to-event modelling, and partially observed training records.
+\end{enumerate}
+\endgroup
+\rev{The contribution is an empirical assessment of when quality indicators agree or conflict, rather than a claim of universally improved prediction. Section~\ref{sec:related} reviews related work; Section~\ref{sec:methodology} describes the methods; Section~\ref{sec:results} presents results and limitations; and Section~\ref{sec:conclusion} concludes the paper.}
+
+\FloatBarrier
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Synthetic Data Generation for Healthcare}
+
+\rev{Synthetic patient data has been investigated as a means of supporting analysis when access to clinical records is constrained \cite{goncalves2020,gonzales2023,guillaudeux2023}. Evaluation must distinguish resemblance to the source data, utility for a specified task, and disclosure risk. These properties need not improve together, and synthetic generation does not by itself guarantee privacy.}
+
+\rev{On the other hand, classic augmentation methods have their own limitations. For example, synthetic minority over-sampling technique (SMOTE) builds new minority-class samples by interpolating between existing records, so it cannot produce anything outside the range already present in the data \cite{kumari2024}, \cite{figueira2022}. Rule-based and statistical generators are easier to interpret but often miss the complex, non-linear relationships between clinical biomarkers. Deep generative models can learn nonlinear relationships directly from data, although this flexibility does not guarantee better utility or fidelity \cite{yan2022}, \cite{nikolentzos2023}.}
+
+\subsection{GAN Architectures for Tabular Clinical Data}
+
+GANs work by training a generator and a discriminator against each other \cite{vega2020}. The generator tries to produce realistic synthetic records, while the discriminator attempts to distinguish synthetic records from real ones. In the context of healthcare application, previous studies have shown that GAN-generated data can improve risk prediction using electronic health records \cite{che2017}. Choi et al.\ proposed medGAN for generating multi-label patient records, showing that GAN-based approaches can be useful for clinical data synthesis \cite{choi2017}. However, standard GANs often experience mode collapse and unstable training when applied to tabular clinical datasets containing a mixture of continuous variables, binary indicators, and ordinal disease-stage variables \cite{lenz2021}, \cite{espinosa2023}.
+
+\rev{In contrast, the cGAN has been developed to reduce some of these problems by conditioning both the generator and the discriminator on a class label, which helps ensure that minority classes are represented more fairly during training \cite{vega2020}, \cite{sharma2024}. A VAE uses a different strategy: instead of adversarial training, it learns a latent representation of patient records through an encoder-decoder structure, and new patient records are generated at inference time by sampling from that latent space \cite{nikolentzos2023}.}
+
+%\subsection{Synthetic Data for IoMT}
+%
+%IoMT systems continuously collect physiological measurements from connected medical devices, and these systems require large labelled datasets to support reliable machine learning models \cite{guo2021}, \cite{obeid2023}.
+%
+%Previous studies have shown that synthetic data can improve anomaly detection in IoMT environments \cite{meidan2018}. Other researchers have demonstrated that synthetic patient cohorts can support research in diseases where the number of available real patients is very small \cite{damico2023}. Synthetic augmentation has also been reported to improve survival prediction in rare-disease tabular datasets similar in nature to the PBC dataset used in this study \cite{kim2024}. In addition, high-quality synthetic patient data has been shown to be useful for testing healthcare software systems, provided that the quality of the generated data is carefully evaluated \cite{tucker2020}.
+
+\subsection{From Distributional Fidelity to Predictive Utility}
+
+\rev{Most of the approaches so far focus on distributional fidelity, how closely synthetic data resembles real data, using metrics like Fr\'{e}chet Inception Distance (FID), Jensen-Shannon divergence, or Kolmogorov-Smirnov statistics \cite{yan2022}, \cite{figueira2022}, \cite{dankar2022}. However, good distributional similarity does not guarantee good predictive performance. Espinosa and Figueira found the link between distributional metrics and downstream utility is often weak \cite{espinosa2023}. Foraker et al.\ reported that synthetic data can give different analytical results than the real data it was built from, even when it looks highly realistic \cite{foraker2020}. Kababji et al.\ argued a more meaningful test is whether models trained on synthetic data can reproduce clinically important findings from real patients \cite{kababji2023}. Kaabachi et al.\ pointed to a lack of evaluation on fully held-out real patients as a major weakness across many medical synthetic-data studies \cite{kaabachi2023}. These findings motivate testing predictive utility on unseen real patients alongside distributional similarity, particularly in small clinical cohorts \cite{kababji2023,espinosa2023}.}
+
+\subsection{Multi-Model Ensemble Strategy}
+
+Some previous studies have explored the idea of combining the outputs of multiple generative models. Jiang et al.\ proposed a multi-source augmentation framework in which several GAN models are trained independently and their outputs are combined to improve data quality \cite{jiang2023}. The consensus voting method used in this study is related to that idea, but differs in two important ways. First, it uses three different generative architectures rather than several versions of the same GAN. Second, a synthetic record is accepted only when there is agreement across all three models, instead of simply merging all generated records together.
+
+\rev{Pandey et al.\ examine conditional synthetic generation in an IoMT setting \cite{pandey2025}. The present study instead evaluates baseline tabular clinical records and follow-up outcomes. Its consensus procedure tests whether proximity across independently generated pools provides a useful selection criterion. The results identify circumstances in which statistical agreement is insufficient to establish downstream benefit, providing evidence for task-specific quality assessment.}
+
+\rev{Two studies provide complementary methodological context. Stenger et al.\ organise synthesis-quality assessment for time series \cite{stenger2024}; the present work applies a multidimensional evaluation perspective to a static clinical table with survival outcomes. Mamun et al.\ combine CTGAN augmentation with filtering for neonatal outcome prediction and explanation \cite{mamun2026}; the present study examines a different disease cohort and explicitly contrasts fidelity, augmentation, synthetic-only utility, and empirical disclosure indicators.}
+
+\begin{table*}[!t]
+\revisioncolor
+\centering
+\caption{\revisioncolor Selected Related Work and Its Relationship to the Present Evaluation}
+\label{tab:related}
+\footnotesize
+\begin{tabular}{p{0.20\textwidth}p{0.28\textwidth}p{0.44\textwidth}}
+\toprule
+Study & Focus & Relationship to the present study \\
+\midrule
+Gon\c{c}alves et al.\ \cite{goncalves2020}; Gonzales et al.\ \cite{gonzales2023} & Synthetic patient data generation and healthcare synthesis literature & Establish the clinical-data context; the present study evaluates a specific PBC cohort and prediction task. \\
+Choi et al.\ \cite{choi2017}; Xu et al.\ \cite{xu2019} & Generative modelling of patient records and mixed tabular data & Provide model context; cGAN, VAE, and CTGAN are distinguished explicitly rather than treated as interchangeable architectures. \\
+Yan et al.\ \cite{yan2022} & Benchmarking synthetic electronic health records & Motivates reporting multiple evaluation dimensions alongside downstream prediction. \\
+Stenger et al.\ \cite{stenger2024} (JDIQ) & Systematic assessment of time-series synthesis quality & Supports structured quality evaluation; the data modality differs from the static PBC table. \\
+Mamun et al.\ \cite{mamun2026} (ACM HEALTH) & CTGAN augmentation and filtering for neonatal prediction and explanation & Provides a clinical augmentation comparison; benefits must be tested anew for the PBC task. \\
+Present study & PBC synthesis, statistical filtering, and cross-model consensus & Separates fidelity, empirical disclosure risk, augmentation, and synthetic-only utility, with three outcome framings. \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+% ---------------------------------------------------------------
+% Section III: Methodology
+% ---------------------------------------------------------------
+\FloatBarrier
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Dataset and Preprocessing}
+
+\rev{The Mayo Clinic PBC dataset is obtained from the UCI Machine Learning Repository \cite{fleming1991,ucipbc}. After removal of the patient identifier, it contains 19 variables: 17 baseline covariates, follow-up duration (N\_Days), and outcome status. The 11 continuous variables comprise follow-up duration, age, bilirubin, cholesterol, albumin, copper, alkaline phosphatase (Alk\_Phos), serum glutamic-oxaloacetic transaminase (SGOT), triglycerides, platelets, and prothrombin. Age and follow-up duration are not laboratory biomarkers. Five variables are binary (sex, treatment, ascites, hepatomegaly, and spiders), and two are ordinal (edema and histological stage). Follow-up duration is an outcome-related variable, not a baseline predictor.}
+
+\rev{Complete-case selection retains 276 of 418 records. The excluded records include 106 observational-cohort patients with extensive missing measurements and 36 patients with fewer missing fields. Complete-case analysis avoids specifying an imputation model but can introduce selection bias; additional analyses therefore examine partially observed records. Binary variables are encoded as sex (female~=~0, male~=~1), treatment (placebo~=~0, D-penicillamine~=~1), and clinical signs (absent~=~0, present~=~1). Edema categories N, S, and Y are mapped to 0, 1, and 2; stage remains coded 1--4. For binary classification, status is encoded as deceased~=~1 and censored/transplanted~=~0. This binary endpoint does not account for differences in follow-up and is supplemented by fixed-horizon and survival analyses.}
+
+\rev{A stratified 70:30 split with random seed 42 produces 193 training patients and 83 held-out test patients. The training partition contains 115 censored/transplanted patients and 78 deaths. The min-max scaler used for generation is fitted on the training partition only. N\_Days remains a generated variable for outcome construction and survival analysis, but all predictive models use only the 17 baseline covariates.}
+
+\rev{Figure~\ref{fig:raincloud} displays the distributions of selected biomarkers in the real training partition. The half-violin density, box plot, and individual observations show skewness and between-patient variability that summary means can obscure. The figure is descriptive and does not use test patients to set filtering thresholds.}
+
+\begin{figure*}[!t]
+\revisioncolor
+\centering
+\includegraphics[width=0.95\textwidth]{fig13_training_raincloud.png}
+\Description{Training-only biomarker distributions stratified by recorded status; points, densities, and box plots show the small-sample spread.}
+\caption{\revisioncolor Raincloud plots of bilirubin, albumin, and prothrombin in the 193 real training patients, grouped by recorded outcome (78 deaths; 115 censored/transplanted). Each panel combines a half-violin density, median and interquartile range, and individual observations. Bilirubin uses a logarithmic axis; its density is estimated in log space. Censored/transplanted status does not imply survival over a common follow-up horizon.}
+\label{fig:raincloud}
+\end{figure*}
+
+\subsection{Generative Model Architectures}
+
+All three models are implemented from scratch in TensorFlow 2.15 without third-party synthetic data libraries. Each model receives the min-max scaled training data and produces samples in the same normalised $[0, 1]$ range, which are inverse-transformed to recover original clinical units after generation. Each model generates 500 synthetic records.
+
+\begingroup
+\begin{enumerate}
+\revisioncolor
+  \item {\textbf {Vanilla GAN:}} The generator maps a 100-dimensional noise vector $\mathbf{z}$ drawn from a standard normal distribution through two dense hidden layers of 128 and 256 units with leaky ReLU activations ($\alpha = 0.2$) and batch normalisation (momentum~$= 0.8$) to a sigmoid output of dimension 19 (18 generated variables plus the outcome label). The discriminator maps each patient record through two dense layers of 256 and 128 units with leaky ReLU activations and dropout ($p = 0.3$). Both networks use the Adam optimiser with learning rate $2 \times 10^{-4}$ and $\beta_1 = 0.5$ for 500 epochs at batch size 32. The adversarial objectives are:
+\begin{align}
+\mathcal{L}_D &= -\mathbb{E}[\log D(\mathbf{x})] - \mathbb{E}[\log(1 - D(G(\mathbf{z})))] \\
+\mathcal{L}_G &= -\mathbb{E}[\log D(G(\mathbf{z}))]
+\end{align}
+
+where $G$ is the generator, $D$ is the discriminator, $\mathbf{x}$ denotes a real training record, and $\mathbf{z}$ is a sampled noise vector. Expectations are taken over the real-data and latent-noise distributions, respectively.
+
+\item {\textbf {cGAN:}} Both networks condition on the binary outcome label $\mathbf{y}$, encoded as a two-element one-hot vector, following Mirza and Osindero \cite{mirza2014}. The generator receives $[\mathbf{z}\|\mathbf{y}]$ and the discriminator receives $[\mathbf{x}\|\mathbf{y}]$. Architecture and optimiser settings match the Vanilla GAN; training uses balanced mini-batches and 300 epochs. This implementation differs from CTGAN \cite{xu2019}: it does not include mode-specific normalisation, training-by-sampling, or a packed Wasserstein critic. A separate CTGAN comparison is reported in Section~\ref{sec:ctgancomp}.
+
+\item {\textbf {VAE:}} A standard variational autoencoder is fitted to the min-max-scaled table. It does not implement the mode-specific preprocessing of TVAE \cite{xu2019}; the label VAE therefore identifies the architecture evaluated here. The encoder maps each patient record through two dense layers of 128 and 64 units with ReLU activations to a mean vector $\boldsymbol{\mu}$ and log-variance vector $\log(\boldsymbol{\sigma}^2)$ of dimension 32. A latent sample is drawn using the reparameterisation trick:
+\begin{equation}
+\mathbf{z} = \boldsymbol{\mu} + \boldsymbol{\varepsilon} \cdot \exp(0.5 \cdot \log(\boldsymbol{\sigma}^2)),
+\end{equation}
+where $\boldsymbol{\varepsilon}$ is drawn from a standard normal. The decoder maps $\mathbf{z}$ through two dense layers of 64 and 128 units with ReLU activations to a sigmoid output of dimension 19 (18 generated variables plus the outcome label). The training objective is the evidence lower bound (ELBO):
+\begin{equation}
+\mathcal{L}_{\text{VAE}} = \mathbb{E}\!\left[\|\mathbf{x} - \hat{\mathbf{x}}\|^2\right] + \beta \cdot D_{\text{KL}}\!\left(\mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\sigma}^2) \,\|\, \mathcal{N}(\mathbf{0}, \mathbf{I})\right)
+\end{equation}
+with $\beta = 1.0$, Adam optimiser at learning rate $1 \times 10^{-3}$, batch size 32, and 300 training epochs. Training loss curves for all three models are given in Fig.~S2 in the supplementary file. The loss curves describe optimisation behaviour; they do not establish convergence or exclude mode collapse.
+\end{enumerate}
+\endgroup
+
+\subsection{IQR-Based Statistical Outlier Filter}
+
+\rev{Tukey's inner fences are used to flag statistical outliers \cite{nistfences}. For each of the 11 continuous variables, quartiles $Q_1$ and $Q_3$ are estimated from real training data and $\mathrm{IQR}=Q_3-Q_1$. A generated record is retained only if every continuous value lies within $[Q_1-1.5\,\mathrm{IQR},Q_3+1.5\,\mathrm{IQR}]$. Binary and ordinal variables are mapped to valid categories during post-processing. These empirical fences are not clinical reference ranges: an excluded value may represent a genuine severe case. Filtering can therefore truncate clinically relevant tails as well as remove synthetic outliers.}
+
+Applied to 500 generated records per model, the filter retained 331 GAN records (66.2\%), 292 cGAN records (58.4\%), and 499 VAE records (99.8\%). Fig.~S13 in the supplementary file illustrates the effect on the Bilirubin distribution, the most challenging continuous feature to reproduce effectively.
+
+\subsection{Multi-Method Consensus Voting}
+
+\rev{Consensus is defined as local agreement between synthetic pools, rather than agreement between predicted labels. Let $S_1,S_2,S_3$ denote the filtered outputs of the three core generators. A candidate $\mathbf{x}\in S_i$ is retained only if each other pool contains at least one neighbouring record within a common distance tolerance. Neighbours need not be identical or describe the same patient. Unlike simply pooling multiple generators \cite{jiang2023}, this rule requires representation of the candidate's local feature region in all three architectures.}
+
+\rev{Consensus distances include all 19 generated columns, including follow-up duration and the binary outcome label. Each column is standardised as $z_j=(x_j-\mu_j)/s_j$, where $\mu_j$ and $s_j$ are its mean and standard deviation in the combined filtered synthetic pools. The implementation uses scikit-learn's \texttt{StandardScaler} \cite{pedregosa2011}. For each candidate record from one model, the minimum Euclidean distance to any record from each of the other two models is computed in standardised space. The candidate is accepted if both other models have a record within tolerance~$= 5.0$ standardised units. This process repeats with each filtered dataset as the candidate pool in turn, and exact duplicates are removed from the final set. The threshold of 5.0 was selected on the basis of a systematic sensitivity analysis conducted across eight values from 2.5 to 6.0. At thresholds of 3.0 and below, the accepted set contains around 10\% deceased patients or fewer, a severe class imbalance relative to the real training cohort (40\% deceased). As the tolerance increases the deceased fraction recovers (24.7\% at 5.0) and the FID score falls monotonically (0.095 at 5.0), after which further increases yield only marginal FID improvements (0.0864 at 5.5, 0.0829 at 6.0) while admitting records with progressively weaker cross-model agreement. The value of 5.0 is an empirical compromise between retention and cross-model proximity; it does not restore the real outcome proportion or establish an optimal threshold. To address the pool-size imbalance across the three filtered datasets (GAN 331 records, cGAN 292 records, VAE 499 records), the VAE pool is randomly downsampled to 292 records before voting, matching the size of the smallest adversarial pool. This equalisation gives the two higher-fidelity adversarial models a proportionally stronger role in the consensus. The equalised consensus of 787 records achieves FID 0.0809, with source composition GAN 33.2\%, cGAN 29.7\%, and VAE 37.1\%.}
+
+\subsection{Synthetic Data Quality Evaluation}
+
+\rev{Distributional fidelity is summarised by a Gaussian Fr\'{e}chet distance, retained under the label FID for consistency with the result files. It is calculated on the 11 continuous variables, using min-max scaling fitted to real training data; no Inception network is used:}
+\begingroup
+\begin{equation}
+\revisioncolor
+\mathrm{FID}=\|\boldsymbol{\mu}_r-\boldsymbol{\mu}_s\|^2+
+\mathrm{Tr}\left(\boldsymbol{\Sigma}_r+\boldsymbol{\Sigma}_s
+-2(\boldsymbol{\Sigma}_r\boldsymbol{\Sigma}_s)^{1/2}\right).
+\end{equation}
+\endgroup
+\rev{Here $\boldsymbol{\mu}_r,\boldsymbol{\mu}_s$ are real and synthetic mean vectors, $\boldsymbol{\Sigma}_r,\boldsymbol{\Sigma}_s$ are covariance matrices, and $\mathrm{Tr}$ denotes the matrix trace. Lower values indicate closer first and second moments, not necessarily matching joint distributions or predictive value.}
+
+\rev{Per-variable Kolmogorov--Smirnov tests assess differences between empirical continuous distributions. Histogram-based Jensen--Shannon divergence summarises distributional dissimilarity, while Cohen's $d$ measures standardised mean differences. Shapiro--Wilk tests describe normality in the real data, and chi-square tests compare categorical frequencies. These complementary measures distinguish mean agreement from distributional shape; the multiple per-feature tests are exploratory.}
+
+\rev{Empirical disclosure risk is screened using nearest-neighbour distances across the 18 generated non-status variables, including N\_Days. For this analysis, means and standard deviations are fitted to real training patients, then applied to both real and synthetic records \cite{pedregosa2011}. A synthetic record is flagged when its nearest-real distance is below the fifth percentile of leave-one-out real-to-real nearest-neighbour distances. The resulting near-duplicate rate is a proximity indicator, not a probability of re-identification or a formal privacy guarantee.}
+
+\subsection{Predictive Utility Evaluation}
+\label{sec:predutil}
+
+\rev{N\_Days records time from registration to death, transplantation, or censoring. It is unavailable at baseline and is excluded from all predictor inputs. Generators retain it as an outcome-related quantity so that synthetic follow-up and status can define three-year labels or time-to-event targets. The same separation between baseline predictors and outcome information is applied to real and synthetic records.}
+
+Predictive utility is evaluated by training random forest (RF), gradient boosting (GB), and logistic regression (LR) classifiers under the following five training scenarios and testing on the 83-patient held-out real test set:
+\begingroup
+\begin{enumerate}
+\revisioncolor
+  \item \textbf{Scenario A:} 193 real patients only (baseline).
+  \item \textbf{Scenario B:} 193 real + IQR-filtered cGAN records. cGAN is selected here because it achieves the lowest FID among the three individual trained generators (refer section~\ref{sec:results}).
+  \item \textbf{Scenario C:} 193 real + consensus records.
+  \item \textbf{Scenario D:} 193 real patients augmented with SMOTE oversampling. Scenario A is the primary real-only reference; Scenario D is an established oversampling comparator used to assess whether generative methods offer benefits beyond interpolation.
+  \item \textbf{Scenario E:} IQR-filtered synthetic records only, with no real patients in training (synthetic-only, train-on-synthetic-test-on-real). Section~\ref{sec:sixgen} extends this scenario from cGAN alone to all six synthetic-data methods available in this study (Vanilla GAN, cGAN, VAE, a masked-loss VAE trained on a larger partially observed pool, a full CTGAN implementation, and consensus), so that FID can be checked against downstream utility across more than one point.
+\end{enumerate}
+\endgroup
+\rev{The classifiers use fixed configurations across scenarios: RF and GB have 200 estimators, GB has maximum depth 3, and LR allows 1000 iterations. Metrics include accuracy, weighted F1, weighted precision, weighted recall, and AUC-ROC. Bootstrap intervals use 1000 resamples of the held-out test patients. McNemar's exact test compares paired classification errors; it does not test differences in AUC.}
+
+\rev{Five-fold stratified validation partitions the 193 real training patients before fitting any generator. Each training fold independently fits min-max scaling, GAN (500 epochs), cGAN (300 epochs), and VAE (300 epochs); each model generates 500 records. IQR bounds use only the real training fold. The filtered VAE pool is downsampled to the smaller adversarial-pool size, and consensus is recomputed at tolerance 5.0. Classifier scaling is fitted only to the corresponding augmented training fold; SMOTE is fitted within the fold. Validation uses only real patients, and the 83-patient test cohort is excluded throughout. The implementation rejects precomputed pools and stops rather than substituting another method if consensus fails. Generator seeds are 42--46 for folds 1--5; the split and classifier seeds are 42. Settings are fixed from the existing protocol, with no inner hyperparameter search. This is retrospective fold-contained internal validation, not nested model selection or external validation. Python 3.9.6, TensorFlow 2.15.0, NumPy 1.26.4, and scikit-learn 1.5.2 were used for the corrected rerun. Per-fold membership, scaling bounds, generated pools, and AUCs are retained in the accompanying artifact.}
+
+\subsection{Fixed-Horizon Classification}
+\label{sec:landmark}
+
+\rev{A three-year endpoint is used to reduce ambiguity from unequal follow-up in the binary status outcome. Death before 1,095.75 days is labelled an event; observed survival to that horizon is labelled a non-event, irrespective of later outcome. Patients censored or transplanted before the horizon are excluded because their death status at that horizon is not observed. This exclusion does not eliminate potential selection bias from censoring. The same rule is applied to real and synthetic records. It retains 187 of 193 training patients and 76 of 83 test patients. Scenarios A--E use the same 17 baseline predictors. The term fixed-horizon classification is used because this analysis does not introduce a later prediction landmark with updated covariates.}
+
+\subsection{Time-to-Event Survival Modelling}
+\label{sec:survival}
+
+\rev{A Cox proportional-hazards model with ridge penalty 0.1 and a random survival forest (RSF; 200 trees, minimum leaf size 3) use N\_Days as duration, status as event indicator, and the same 17 baseline covariates. Harrell's concordance index (C-index) is evaluated on held-out real patients. These models use observed follow-up time rather than assigning every censored patient the same binary prognosis.}
+
+\rev{Death is the event of interest; patients are removed from the risk set at transplantation or other censoring. The Cox analysis estimates a cause-specific death hazard and does not directly estimate death probability in the presence of transplantation. Figure~S11 reports Aalen--Johansen cumulative incidence estimates with transplantation treated as a competing event. The 276 complete cases include 111 deaths and 18 transplants. These event counts alone cannot establish that competing-risk effects are negligible. Fine--Gray regression or an explicit cause-specific cumulative-incidence analysis would be needed to examine that question; neither is reported here.}
+
+\rev{Scenarios A--E parallel the classification experiments. For Scenario D, an exploratory event-class interpolation procedure generates records between same-class neighbours in standardised covariate space. It applies the same interpolation weight to the covariates and duration, retaining event~=~1 until event and censored classes are balanced. This procedure is not standard SMOTE and has not been independently validated for survival outcomes.}
+
+\rev{Kaplan--Meier curves and exploratory log-rank tests compare synthetic and real training follow-up distributions, with transplantation censored. These comparisons supplement marginal fidelity metrics; they do not establish equivalent survival distributions when a test is non-significant.}
+
+\begin{figure*}[!t]
+\revisioncolor
+\centering
+\includegraphics[width=0.98\textwidth]{fig14_study_overview.png}
+\Description{The train and test split precedes generation; fitted pools undergo filtering and consensus before distinct fidelity, disclosure, and prediction evaluations.}
+\caption{\revisioncolor Overview of the evaluation. The held-out test partition is separated before generator fitting. Five generative models and a consensus-derived dataset are assessed through distinct fidelity, disclosure-screening, and prediction tasks. The masked-loss VAE uses additional partially observed training records. Generative cross-validation was rerun with independent fitting, filtering, and consensus construction inside each training fold.}
+\label{fig:overview}
+\end{figure*}
+
+\section{Results and Discussion}
+\label{sec:results}
+
+\subsection{Synthetic Data Retention and IQR Filtering}
+
+Table~\ref{tab:retention} summarises IQR filter retention rates and FID scores. The GAN and cGAN each reject approximately 33\% to 42\% of their generated records; the VAE retains almost all. The consensus procedure accepts 787 records from the equalised filtered pools (VAE downsampled to 292).
+
+\begin{table}[!tb]
+  \centering
+  \caption{Synthetic Data Retention and FID Scores}
+  \label{tab:retention}
+  \begin{tabular}{lcccc}
+    \toprule
+    Method & Generated & Retained & Retention & FID \\
+    \midrule
+    Vanilla GAN   & 500 & 331 & 66.2\% & 0.0995 \\
+    cGAN         & 500 & 292 & 58.4\% & 0.0724 \\
+    VAE          & 500 & 499 & 99.8\% & 0.2280 \\
+    Consensus     & ---  & 787 & ---   & 0.0809 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Distributional Fidelity}
+
+\rev{Among the three core generators, cGAN has the lowest FID (0.0724), followed by GAN (0.0995) and VAE (0.2280). Consensus achieves 0.0809. VAE's high retention (99.8\%) therefore does not imply close moment matching. These scores characterise the evaluated outputs and do not establish a general property of each model family.}
+
+Three further views support this ranking are provided in supplementary file. In supplementary file, Fig.~S3 compares feature distributions for six representative clinical variables: albumin and prothrombin are well reproduced by GAN and cGAN, while bilirubin is the hardest feature, with the VAE distribution shifted noticeably rightward relative to real patients. Fig.~S4 compares the Pearson correlation structure of real and consensus data, showing that the consensus set preserves the dominant pairwise associations, including the positive bilirubin-copper and negative N\_days-bilirubin relationships, though weaker correlations are attenuated. Fig.~S5 gives a t-SNE projection in which the GAN and cGAN sets mix with the real patient manifold, the VAE points spread beyond the real density contours, and the consensus set concentrates in the central high-density region.
+
+Per-feature KS tests show a consistent pattern. The filtered GAN shows no significant distributional difference from real training data on age (KS~$= 0.083$, $p = 0.348$), triglycerides (KS~$= 0.081$, $p = 0.380$), and prothrombin (KS~$= 0.092$, $p = 0.234$), but diverges significantly on bilirubin (KS~$= 0.413$), Alk\_Phos (KS~$= 0.506$), and cholesterol (KS~$= 0.308$). The VAE diverges significantly on all 11 continuous features. The consensus set achieves substantially smaller KS statistics on the most challenging biomarkers: bilirubin KS~$= 0.269$ vs.\ GAN's 0.413; Alk\_Phos KS~$= 0.249$ vs.\ GAN's 0.506.
+
+\subsection{Privacy Risk Assessment}
+
+\rev{Table~\ref{tab:privacy} and supplementary Fig.~S14 report proximity-based disclosure indicators. The near-duplicate rate is 7.3\% for GAN, 9.6\% for cGAN, 35.7\% for VAE, and 21.1\% for consensus. Consensus therefore does not improve this indicator relative to the individual adversarial pools. The distances do not establish that unflagged records are safe, nor do they measure actual re-identification success.}
+
+\begin{table}[!tb]
+  \centering
+  \caption{Privacy Risk Analysis}
+  \label{tab:privacy}
+  \begin{tabular}{lcccc}
+    \toprule
+    Method & Records & Mean Dist. & Near-Dup. & Rate \\
+    \midrule
+    GAN (filtered)   & 331 & 2.23 & 24  & 7.3\%  \\
+    cGAN (filtered) & 292 & 2.34 & 28  & 9.6\%  \\
+    VAE (filtered)  & 499 & 1.60 & 178 & 35.7\% \\
+    Consensus        & 787 & 1.91 & 166 & 21.1\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Predictive Utility on the Held-Out Test Set}
+
+\rev{Table~\ref{tab:performance} separates the real-only reference (A), augmentation strategies (B--D), and synthetic-only cGAN training (E). The highest real-only AUC is 0.8424 for LR. cGAN and consensus augmentation give slightly higher LR AUCs (0.8467 and 0.8461), but effects differ across classifiers and metrics. Synthetic-only training retains discrimination for RF and LR, while GB falls to AUC 0.6867. These comparisons concern the same 83 real test patients; weighted recall equals accuracy under the reported multiclass-averaging convention.}
+
+\begin{table*}[t]
+\revisioncolor
+  \centering
+  \caption{\revisioncolor Test-Set Classification Performance, N\_days Excluded from Classifier Input (83 Real Held-Out Patients)}
+  \label{tab:performance}
+  \begin{tabular}{llccccccc}
+    \toprule
+    Scenario & Classifier & $n_{\text{train}}$ & Accuracy & F1 & Precision & Recall & AUC \\
+    \midrule
+    A: Baseline       & RF      & 193 & 0.7831 & 0.7848 & 0.7901 & 0.7831 & 0.8324 \\
+    A: Baseline       & GB  & 193 & 0.7831 & 0.7848 & 0.7901 & 0.7831 & 0.8297 \\
+    A: Baseline       & LR & 193 & 0.8193 & 0.8204 & 0.8237 & 0.8193 & 0.8424 \\
+    \midrule
+    B: Real + cGAN   & RF      & 485 & 0.7831 & 0.7848 & 0.7901 & 0.7831 & 0.8370 \\
+    B: Real + cGAN   & GB  & 485 & 0.7952 & 0.7965 & 0.7998 & 0.7952 & 0.8085 \\
+    B: Real + cGAN   & LR & 485 & 0.7590 & 0.7614 & 0.7716 & 0.7590 & 0.8467 \\
+    \midrule
+    C: Real + Consensus & RF    & 980 & 0.7590 & 0.7614 & 0.7716 & 0.7590 & 0.8321 \\
+    C: Real + Consensus & GB& 980 & 0.7108 & 0.7139 & 0.7301 & 0.7108 & 0.8176 \\
+    C: Real + Consensus & LR & 980 & 0.8193 & 0.8211 & 0.8346 & 0.8193 & 0.8461 \\
+    \midrule
+    D: Real + SMOTE   & RF      & 230 & 0.7952 & 0.7965 & 0.7998 & 0.7952 & 0.8191 \\
+    D: Real + SMOTE   & GB  & 230 & 0.7590 & 0.7614 & 0.7716 & 0.7590 & 0.8339 \\
+    D: Real + SMOTE   & LR & 230 & 0.7590 & 0.7616 & 0.7782 & 0.7590 & 0.8358 \\
+    \midrule
+    E: Synthetic Only (cGAN) & RF      & 292 & 0.6867 & 0.6840 & 0.7672 & 0.6867 & 0.8091 \\
+    E: Synthetic Only (cGAN) & GB  & 292 & 0.6506 & 0.6506 & 0.7076 & 0.6506 & 0.6867 \\
+    E: Synthetic Only (cGAN) & LR & 292 & 0.6988 & 0.6988 & 0.7600 & 0.6988 & 0.8485 \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+\rev{Figure~\ref{fig:roc} shows ROC curves for Scenarios A--C using the 17 baseline predictors. LR achieves AUC 0.842 with real-only training, 0.847 with cGAN augmentation, and 0.846 with consensus augmentation. The bootstrap intervals overlap, and the paired accuracy tests do not establish an improvement. Neither interval overlap nor McNemar's test constitutes a direct test of the AUC differences.}
+
+\begin{figure*}[!t]
+\revisioncolor
+  \centering
+  \includegraphics[width=0.98\textwidth]{fig06_roc_curves.png}
+\Description{Three panels compare held-out receiver operating characteristic curves for Random Forest, Gradient Boosting, and logistic regression across training scenarios.}
+  \caption{\revisioncolor ROC curves by classifier and training scenario on the 83-patient real held-out test set, N\_days excluded from classifier input: RF (left), GB (centre), LR (right). All curves lie substantially above the random classifier diagonal. The highest baseline AUC is now LR at 0.842; GB's baseline AUC falls from 0.878 (N\_days included) to 0.830 once the leaked feature is removed.}
+  \label{fig:roc}
+\end{figure*}
+
+\rev{Supplementary Figures~S6--S10 provide precision--recall curves and metric comparisons. Scenarios A--D have AUCs above 0.80 for the reported classifiers, whereas synthetic-only cGAN training yields AUC 0.6867 for GB. Discrimination and threshold-dependent performance should therefore be interpreted separately; no strategy improves every metric for every classifier.}
+
+\subsection{Cross-Validation}
+
+\rev{Table~\ref{tab:cv} replaces the earlier generative cross-validation estimates with a completed fold-contained rerun. Each of the five folds retrains GAN, cGAN, and VAE using only its 154 or 155 real training patients, generates 500 records per model, and recomputes IQR filtering, equalisation, and consensus. Validation uses the remaining 38 or 39 real patients. Both generative augmentation strategies have lower mean AUC than the real-only baseline for all three classifiers. For consensus, LR mean AUC is 0.7803 rather than the earlier, fold-leaked estimate of 0.8349. SMOTE yields a small descriptive RF increase from 0.8499 to 0.8559. Means and standard deviations summarise five correlated folds; these comparisons are not significance tests or confidence intervals.}
+
+\begin{table}[tb]
+\revisioncolor
+\centering
+\caption{\revisioncolor Rerun Five-Fold AUC: Mean $\pm$ Fold Standard Deviation; Follow-up Duration Excluded}
+\label{tab:cv}
+\begin{tabular}{lccc}
+\toprule
+Scenario & RF & GB & LR \\
+\midrule
+A: Baseline & $0.8499 \pm 0.0464$ & $0.8358 \pm 0.0535$ & $0.8321 \pm 0.0475$ \\
+B: Real + cGAN & $0.8227 \pm 0.0573$ & $0.8081 \pm 0.0688$ & $0.8184 \pm 0.0618$ \\
+C: Real + Consensus & $0.8377 \pm 0.0723$ & $0.8088 \pm 0.0573$ & $0.7803 \pm 0.0404$ \\
+D: Real + SMOTE & $0.8559 \pm 0.0377$ & $0.8126 \pm 0.0279$ & $0.8300 \pm 0.0440$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Bootstrap Confidence Intervals and McNemar's Test}
+
+\rev{Table~\ref{tab:significance} reports test-set AUC intervals and paired accuracy comparisons for cGAN, consensus, and SMOTE augmentation. All nine McNemar $p$-values exceed 0.05. The smallest values are for GB with consensus ($p=0.070$) and LR with SMOTE ($p=0.063$); both comparisons have more newly incorrect than newly correct predictions. These are not near-significant gains. The separate AUC intervals describe uncertainty, while a paired procedure would be needed to test AUC differences.}
+
+\begin{table}[!htbp]
+\revisioncolor
+  \centering
+  \caption{\revisioncolor Test-Set AUC with 95\% Bootstrap Confidence Intervals (1000 Resamples) and McNemar's Exact Test Against the Baseline ($\alpha = 0.05$), N\_Days Excluded from Classifier Input. $n_{10}$ counts patients the baseline classified correctly and the augmented model did not; $n_{01}$ counts the reverse. McNemar compares each augmented scenario against Scenario~A, so no test applies to the baseline rows.}
+  \label{tab:significance}
+  \fitwidth{%
+  \begin{tabular}{llccccc}
+    \toprule
+    Clf. & Scenario & AUC & 95\% CI & $n_{10}$ & $n_{01}$ & $p$ \\
+    \midrule
+    RF & A: Baseline        & 0.8324 & [0.734, 0.929] & --- & --- & --- \\
+    RF & B: Real + cGAN    & 0.8370 & [0.748, 0.917] & 2 & 2 & 1.000 \\
+    RF & C: Real + Consensus& 0.8321 & [0.727, 0.916] & 3 & 1 & 0.625 \\
+    RF & D: Real + SMOTE    & 0.8191 & [0.720, 0.911] & 1 & 2 & 1.000 \\
+    \midrule
+    GB & A: Baseline        & 0.8297 & [0.721, 0.920] & --- & --- & --- \\
+    GB & B: Real + cGAN    & 0.8085 & [0.692, 0.903] & 4 & 5 & 1.000 \\
+    GB & C: Real + Consensus& 0.8176 & [0.719, 0.904] & 7 & 1 & 0.070 \\
+    GB & D: Real + SMOTE    & 0.8339 & [0.729, 0.922] & 4 & 2 & 0.688 \\
+    \midrule
+    LR & A: Baseline        & 0.8424 & [0.744, 0.925] & --- & --- & --- \\
+    LR & B: Real + cGAN    & 0.8467 & [0.748, 0.926] & 7 & 2 & 0.180 \\
+    LR & C: Real + Consensus& 0.8461 & [0.748, 0.934] & 6 & 6 & 1.000 \\
+    LR & D: Real + SMOTE    & 0.8358 & [0.739, 0.923] & 5 & 0 & 0.063 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
+
+Fig.~\ref{fig:importance} shows feature importance rankings from RF and GB trained under scenario A on the 17-feature leak-free input. With N\_days excluded, bilirubin leads both classifiers by a wide margin (RF 0.162, GB 0.228), followed by copper, prothrombin, and alkaline phosphatase; GB additionally weights age highly (0.159). Binary clinical indicators such as ascites, drug, spiders, and edema carry comparatively low weight, as before. This ranking is clinically coherent with PBC prognosis and, unlike the earlier N\_days-inclusive ranking, is not an artefact of the outcome's own follow-up duration leaking into the input.
+
+\begin{figure*}[!t]
+\revisioncolor
+  \centering
+  \includegraphics[width=0.98\textwidth]{fig07_feature_importance.png}
+\Description{Horizontal bars rank baseline Random Forest and Gradient Boosting predictor importance, with bilirubin ranked first in both.}
+  \caption{\revisioncolor Feature importance rankings from RF (left) and GB (right) trained on real data only under scenario A, N\_days excluded from the input. }
+  \label{fig:importance}
+\end{figure*}
+
+\subsection{Fixed-Horizon Classification Results}
+\label{sec:landmarkresults}
+
+\rev{Table~\ref{tab:landmark} reports three-year classification on 187 training patients and 76 test patients, with event rates of 17.1\% and 25.0\%, respectively. Real-only LR reaches AUC 0.916. RF reaches 0.892 with real-only training, 0.908 with cGAN augmentation, 0.910 with consensus, and 0.874 with SMOTE. The reported McNemar comparisons do not establish accuracy differences ($p=0.453$--1.000). Changes in the endpoint and eligible cohort mean that AUCs cannot be interpreted as direct improvements over the unrestricted status task.}
+
+\begin{table}[!tb]
+\revisioncolor
+  \centering
+  \caption{\revisioncolor Fixed-Horizon Classification Performance, 3-Year Horizon (76 Real Held-Out Patients)}
+  \label{tab:landmark}
+  \fitwidth{%
+  \begin{tabular}{llccc}
+    \toprule
+    Scenario & Classifier & $n_{\text{train}}$ & Accuracy & AUC \\
+    \midrule
+    A: Baseline       & RF      & 187 & 0.8158 & 0.8924 \\
+    A: Baseline       & GB  & 187 & 0.8289 & 0.8356 \\
+    A: Baseline       & LR & 187 & 0.8684 & 0.9160 \\
+    \midrule
+    B: Real + cGAN   & RF     & 443 & 0.8421 & 0.9077 \\
+    B: Real + cGAN   & GB  & 443 & 0.8289 & 0.8652 \\
+    B: Real + cGAN   & LR & 443 & 0.8816 & 0.9252 \\
+    \midrule
+    C: Real + Consensus & RF   & 934 & 0.8289 & 0.9104 \\
+    C: Real + Consensus & GB & 934 & 0.8421 & 0.8680 \\
+    C: Real + Consensus & LR & 934 & 0.8553 & 0.9077 \\
+    \midrule
+    D: Real + SMOTE   & RF     & 310 & 0.8553 & 0.8740 \\
+    D: Real + SMOTE   & GB  & 310 & 0.7895 & 0.8246 \\
+    D: Real + SMOTE   & LR & 310 & 0.8289 & 0.9040 \\
+    \midrule
+    E: Synthetic Only (cGAN) & RF     & 256 & 0.8553 & 0.9100 \\
+    E: Synthetic Only (cGAN) & GB  & 256 & 0.8158 & 0.8901 \\
+    E: Synthetic Only (cGAN) & LR & 256 & 0.9079 & 0.8957 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
+
+\rev{Under the three-year endpoint, the retained VAE synthetic records contain only one outcome class. Binary classifiers therefore cannot be fitted for that synthetic-only condition, and the corresponding results are reported as unavailable. This identifies a failure to preserve the joint distribution of follow-up duration and event status needed for the specified task. It does not imply that every VAE-based method has this limitation.}
+
+\subsection{Time-to-Event Survival Modelling Results}
+\label{sec:survivalresults}
+
+\rev{Table~\ref{tab:survival} reports held-out concordance for Cox and RSF models. Both real-only C-indices are 0.861. Cox values for cGAN, consensus, and event-class interpolation are 0.860, 0.847, and 0.850; RSF values are 0.858, 0.855, and 0.867. These descriptive differences have not undergone a paired significance test. C-index and classification AUC assess different outcomes and comparable numerical values do not establish that censoring information is unimportant.}
+
+\begin{table}[!tb]
+\revisioncolor
+  \centering
+  \caption{\revisioncolor Survival Modelling Performance: Harrell's C-Index (83 Real Held-Out Patients)}
+  \label{tab:survival}
+  \begin{tabular}{lccc}
+    \toprule
+    Scenario & $n_{\text{train}}$ & C-index (Cox) & C-index (RSF) \\
+    \midrule
+    A: Baseline          & 193 & 0.8606 & 0.8612 \\
+    B: Real + cGAN      & 485 & 0.8601 & 0.8584 \\
+    C: Real + Consensus  & 980 & 0.8470 & 0.8549 \\
+    D: Real + SMOTE-analog & 230 & 0.8498 & 0.8669 \\
+    E: Synthetic Only (cGAN) & 292 & 0.8385 & 0.8629 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Discussion}
+
+\rev{The held-out comparisons show model-dependent changes rather than a consistent augmentation advantage. McNemar's tests do not establish differences in classification accuracy at the 0.05 threshold; they do not establish equivalence or test the AUC differences. The small cohort and multiple comparisons limit the strength of both positive and negative conclusions.}
+
+\rev{The corrected cross-validation results do not support an augmentation benefit from cGAN or consensus: their mean AUCs are below the real-only baseline for all three classifiers. The small RF mean-AUC increase with within-fold SMOTE is descriptive, not a formal paired test of improvement. These results reinforce the distinction between synthetic-data resemblance and useful augmentation.}
+
+\label{sec:power}
+\rev{Figure~\ref{fig:power} reports a sensitivity calculation using observed discordant-pair rates. Under its assumptions, a 5-percentage-point accuracy gain has low estimated power in the 83-patient test cohort, and approximately 270 held-out patients would be needed for 80\% power. This conditional calculation is not proof of a true effect or a general sample-size requirement. Non-significant paired tests leave small benefits and harms unresolved.}
+
+\begin{figure*}[!t]
+\revisioncolor
+  \centering
+  \includegraphics[width=0.98\textwidth]{fig08_power_analysis.png}
+\Description{A sensitivity analysis relates discordant-pair counts to McNemar p-values and assumed effect sizes to required test sample sizes.}
+  \caption{\revisioncolor Post-hoc power analysis for McNemar's exact test on 83 held-out patients, using the observed discordant-pair counts from Table~\ref{tab:significance}. Left: statistical power versus number of discordant pairs for three assumed accuracy gains. Right: required test-set size for 80\% power versus true accuracy improvement.}
+  \label{fig:power}
+\end{figure*}
+
+\rev{Scenario~E in Table~\ref{tab:performance} questions whether a classifier trained only on synthetic data can generalise to real patients, using predictors that exclude follow-up duration. Using the 292 IQR-filtered cGAN records as the only training data, and the held-out 83 real patients as the test set, Logistic Regression discriminates best at AUC~$=0.849$, followed by RF at AUC~$=0.809$. GB struggles much more without real data, falling to AUC~$=0.687$. Section~\ref{sec:sixgen} simulates this same comparison across all six synthetic-data methods, which tells us whether this transfer is special to cGAN or holds for synthetic data more broadly.}
+
+\rev{Supplementary Table~S8 compares Scenarios A and C by disease stage (stages 1--2, $n=17$; stages 3--4, $n=66$), sex (female, $n=72$; male, $n=11$), and treatment (D-penicillamine, $n=39$; placebo, $n=44$). Differences vary by classifier and subgroup. The small early-stage and male groups yield particularly unstable estimates; none of these descriptive comparisons establishes subgroup equivalence or fairness. External validation with adequate subgroup sample sizes is required.}
+
+\rev{The output-perturbation sweep is shown in supplementary Fig.~S15 and Table~S6. Gaussian noise is added independently to each of the 11 continuous VAE variables, with standard deviation $\sigma s_j$, where $s_j$ is the corresponding real-training standard deviation; negative perturbed values are clipped to zero. At $\sigma=0.7$, the reported near-duplicate rate falls from 35.7\% to 1.4\%, while the tabular FID falls from 0.228 to 0.0481. This indicates a change in proximity and moment matching, not demonstrated protection against an adversary. Downstream utility and clinical validity after perturbation require separate assessment. The DP-SGD values in supplementary Table~S7 are approximate analytical projections from a simplified privacy-accounting calculation, not results from differentially private model training or certified privacy guarantees.}
+
+\subsection{Interpreting the Effect of Augmentation}
+\label{sec:whynot}
+
+\rev{A generator fitted to a fixed training cohort resamples a learned representation of that cohort. It does not add independent patient observations, but it can change the effective training distribution, regularise a model, or alter class balance. These mechanisms can help or harm prediction depending on the generator, classifier, and task. The present results therefore support an empirical interpretation rather than a theorem that synthetic augmentation cannot improve accuracy.}
+
+\rev{Consensus favours regions represented by all three generator architectures. The resulting concentration may reduce diversity or underrepresent rare outcomes, consistent with the observed class imbalance and near-duplicate rate. However, neither proximity nor the current experiments prove that all accepted records are redundant or that only decision-boundary samples can improve learning. These explanations remain hypotheses for further analysis.}
+
+\rev{Synthetic-only cGAN training yields AUC 0.809 for RF and 0.849 for LR. This demonstrates that the generated data preserve some task-relevant structure in the present split. It does not establish equivalence to real-data training, cross-institution transfer, or a sufficient sample size beyond which augmentation cannot help.}
+
+\subsection{Scenario E Across Six Synthetic-Data Methods: Does FID Predict Utility?}
+\label{sec:sixgen}
+
+\rev{Scenario E is evaluated across five generative models and the consensus-derived dataset to explore the relationship between tabular FID and predictive utility. All classifiers use the same 17 baseline predictors and held-out real patients. CTGAN is evaluated at a fixed budget of 4,000 training epochs; the experiment does not establish an optimally tuned or converged CTGAN benchmark.}
+
+\rev{Table~\ref{tab:sixgen} and Fig.~\ref{fig:sixgen} compare fidelity with synthetic-only AUC. Across six methods, Pearson $r=0.35$ ($p=0.50$) and Spearman $\rho=0.26$ ($p=0.62$) provide insufficient evidence of a consistent association. The masked-loss VAE has the lowest FID (0.0619), whereas Vanilla GAN has the highest mean AUC across classifiers (0.8223). VAE has the largest FID (0.2280) but a mean AUC of 0.8116. These rankings illustrate disagreement between evaluation criteria. With only six related methods, the correlation analysis is exploratory and cannot establish that fidelity and utility are unrelated in general.}
+
+\begin{table}[!tb]
+\revisioncolor
+  \centering
+  \caption{\revisioncolor FID and Train-on-Synthetic-Test-on-Real AUC Across Six Synthetic-Data Methods (17 Baseline Predictors, Status Target)}
+  \label{tab:sixgen}
+  \fitwidth{%
+  \begin{tabular}{lccccc}
+    \toprule
+    Generator & FID & RF AUC & GB AUC & LR AUC & Mean AUC \\
+    \midrule
+    Vanilla GAN     & 0.0995 & 0.8258 & 0.8297 & 0.8115 & 0.8223 \\
+    cGAN           & 0.0724 & 0.8091 & 0.6867 & 0.8485 & 0.7814 \\
+    VAE            & 0.2280 & 0.8403 & 0.8152 & 0.7794 & 0.8116 \\
+    Masked-loss VAE & 0.0619 & 0.8567 & 0.8036 & 0.7321 & 0.7975 \\
+    CTGAN          & 0.1079 & 0.7997 & 0.7321 & 0.7994 & 0.7771 \\
+    Consensus       & 0.0809 & 0.8336 & 0.7933 & 0.7867 & 0.8045 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
+
+\begin{figure}[!tb]
+\revisioncolor
+  \centering
+  \includegraphics[width=\columnwidth]{fig11_fid_vs_tstr.png}
+\Description{Six generator methods are plotted by continuous-feature Frechet distance and mean synthetic-only test AUC; their rankings differ.}
+  \caption{\revisioncolor FID versus mean train-on-synthetic-test-on-real AUC across all six synthetic-data methods in this study.}
+  \label{fig:sixgen}
+\end{figure}
+
+\rev{Follow-up fidelity is assessed separately using Kaplan--Meier curves and exploratory log-rank tests (Fig.~S12). The tests give $p=0.773$ for masked-loss VAE, $p=0.467$ for cGAN, and $p=0.088$ for Vanilla GAN; non-significance does not demonstrate equivalent survival distributions. VAE ($p=0.0006$), CTGAN ($p=0.038$), and consensus ($p=0.010$) show differences at an unadjusted 0.05 threshold. These comparisons are descriptive because synthetic records are derived from the reference cohort and multiple methods are tested. The FID uses continuous-variable moments, not the complete joint distribution of duration and event status, so it need not capture this task-specific structure.}
+
+\subsection{Implications for Connected-Health Research}
+\label{sec:federated}
+
+\rev{Synthetic-only prediction motivates further investigation of data sharing for connected-health research. However, this experiment uses a single historical cohort; it does not evaluate federated learning, transfer between hospitals, wearable streams, communication costs, or deployment governance. The reported AUCs cannot be attributed to a receiving hospital or an external patient population.}
+
+\rev{A future multisite study should test transportability, calibration, subgroup performance, and privacy attacks under the intended access conditions. Near-duplicate screening and output noise can inform such an assessment but do not establish anonymous data release. Generator selection should account for the downstream classifier: the low cGAN GB AUC is not a universal result across generators, as Vanilla GAN and VAE yield GB AUCs of 0.8297 and 0.8152, respectively.}
+
+\subsection{Comparison Against a Full CTGAN Implementation}
+\label{sec:ctgancomp}
+
+\rev{The cGAN follows label-conditioned adversarial learning \cite{mirza2014}. A separate implementation incorporating CTGAN's mode-specific normalisation, conditional training-by-sampling, and packed Wasserstein critic \cite{xu2019} provides an additional comparison. Architecture settings are documented in the supplementary material.}
+
+\rev{At the evaluated budget of 4,000 updates, CTGAN reaches FID 0.108 and retains 40.8\% of generated records after filtering, compared with 0.072 and 58.4\% for cGAN. These values favour cGAN on these two criteria in this run. Differences in optimisation and training budget prevent a general conclusion about architectural superiority. CTGAN remains included in the six-method synthetic-only comparison.}
+
+\subsection{Threats to Validity}
+
+\rev{The study uses one historical PBC cohort, one held-out split, and fixed model settings. Complete-case selection removes 142 patients, including 106 from an observational cohort with extensive missingness. Selection and cohort differences may limit generalisation; the complete-case results do not represent all patients with cirrhosis.}
+
+\rev{A masked-loss VAE uses observed fields from 335 training patients (193 complete plus 142 partial records). Its augmentation yields RF, GB, and LR AUCs of 0.868, 0.846, and 0.824, respectively, compared with real-only values of 0.832, 0.830, and 0.842. For RF, six previously incorrect predictions become correct and one previously correct prediction becomes incorrect; McNemar's exact $p=0.125$ does not establish an accuracy improvement. The additional real records confound a direct architecture-only comparison, and the small test cohort leaves considerable uncertainty.}
+
+\rev{Using only the 36 incomplete same-protocol records provides a more restricted sensitivity analysis. Median-imputed inclusion changes AUC by $+0.004$, $+0.001$, and $+0.007$ for RF, GB, and LR. A masked-loss VAE fitted to the 229-patient pool produces changes of $+0.010$, $-0.016$, and $-0.031$. These descriptive differences indicate classifier dependence rather than a consistently superior strategy.}
+
+\rev{The original generative cross-validation reused pools fitted to all 193 training patients; its estimates are superseded by the fold-contained rerun. The revised code and recorded fold memberships exclude validation patients from preprocessing, generator fitting, and filtering. Nevertheless, this is a retrospective internal evaluation of an existing protocol. Hyperparameters were not selected in a nested inner loop, only one generator seed was used per fold, and fold standard deviations are not confidence intervals. Repeated-seed evaluation and external cohorts remain necessary.}
+
+\rev{McNemar's test assesses paired errors, not AUC or C-index differences. Overlapping separate bootstrap intervals are likewise not a formal paired comparison. Future inference should use paired AUC and survival-performance procedures, repeated splits, and an explicit multiple-comparison strategy.}
+
+\rev{FID compares moments of 11 continuous variables; it does not establish multivariate equivalence or preserve outcome relationships. Near-duplicate rates are empirical screening measures, and the simplified DP-SGD projections do not certify a trained private generator. Transplantation is a competing event; the cause-specific analysis does not directly establish cumulative death risks. These limitations constrain claims of clinical readiness and safe data release.}
+
+\subsection{Practical Implications}
+
+\rev{Synthetic-data evaluation should specify the intended task and preserve an independent real-patient test cohort. Preprocessing, generation, filtering, and model selection should be fitted within each training fold when cross-validation is used. Distributional summaries should be accompanied by prediction metrics, subgroup analyses, and disclosure assessments.}
+
+\rev{For this cohort, the evidence supports further study of synthetic-only modelling and the use of partially observed training records. It does not justify selecting consensus filtering as universally preferable or describing a generator as safe for release. Quality controls should be assessed for their effects on rare outcomes and extreme but valid biomarker values as well as overall resemblance.}
+
+% ---------------------------------------------------------------
+% Conclusion
+% ---------------------------------------------------------------
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\rev{This study evaluated whether quality-filtered synthetic records improve prediction for patients with primary biliary cirrhosis, while separating distributional resemblance, empirical disclosure risk, and downstream utility. The evaluation used 276 complete Mayo Clinic records, divided into 193 training patients and 83 held-out test patients. Three core generative architectures were examined with interquartile-range filtering and cross-model consensus, alongside masked-loss VAE, CTGAN, and SMOTE comparisons. Follow-up duration was excluded from baseline predictors, and binary classification was supplemented by three-year classification and time-to-event modelling.}
+
+\rev{The results demonstrate that synthetic records can retain predictive structure without consistently improving real-data models. Corrected fold-contained validation found lower mean AUC with cGAN and consensus augmentation for all three classifiers. Synthetic-only cGAN training achieved AUCs of 0.809 for Random Forest and 0.849 for logistic regression, while its Gradient Boosting AUC was 0.687. Consensus filtering yielded 787 records but did not establish a consistent predictive advantage and retained a 21.1\% near-duplicate rate. These findings identify task and classifier dependence as central considerations when selecting synthetic data.}
+
+\rev{The masked-loss VAE, which incorporated partially observed training records, achieved the lowest tabular Fr\'{e}chet distance of 0.062. Its augmentation raised Random Forest AUC from 0.832 to 0.868; however, the paired accuracy comparison remained non-significant at $p=0.125$. This result motivates further evaluation of incomplete clinical records rather than establishing a confirmed augmentation benefit. Across six synthetic-data methods, fidelity and mean synthetic-only AUC showed an inconclusive association. The limited number of related methods prevents a general conclusion about their relationship.}
+
+\rev{Several constraints govern interpretation. The test cohort is small, all records originate from one historical dataset, and the corrected cross-validation is retrospective and internal rather than an external evaluation. McNemar's tests concern accuracy rather than AUC, and survival-performance differences were not formally tested. Statistical fences can exclude valid extreme observations, while distance-based privacy screening and output perturbation provide no formal disclosure guarantee. Cross-site transfer and IoMT deployment remain prospective applications.}
+
+\rev{The principal contribution is therefore an empirical framework for examining where synthetic-data quality indicators agree and where they diverge. Future work should repeat fold-specific generation across multiple seeds, evaluate paired performance differences, assess competing risks and subgroup calibration, and validate on independent clinical cohorts. Privacy attacks and validated privacy accounting are also required before considering data release. Such evaluation would establish whether the observed model-specific gains persist and whether quality filtering supports the intended clinical task.}
+
+\subsection*{Supplementary Material}
+\rev{A supplementary document accompanies this paper, containing sixteen figures and eight tables. The figures are cited in the text as Fig.~S1 to Fig.~S16: S1, the Pearson correlation matrix across all 276 complete cases; S2, training loss curves for all three generative models; S3, feature distribution comparisons for six representative clinical variables; S4, real versus consensus correlation structure; S5, a t-SNE projection of real and synthetic records; S6, Precision-Recall curves; S7, AUC across scenarios; S8, the F1-score heatmap; S9 and S10, grouped comparisons of all five evaluation metrics across scenarios; S11, the Aalen-Johansen competing-risks cumulative incidence of death versus transplant discussed in Section~\ref{sec:survival}; S12, the Kaplan-Meier survival curves for all six synthetic-data methods against the real cohort discussed in Section~\ref{sec:sixgen}; S13, the IQR filtering effect on the Bilirubin distribution; S14, the privacy risk violin plots; S15, the VAE privacy-enhancement sweep; and S16, the end-to-end pipeline overview. The supplementary plots are historical artifact-based analyses; they must not be used as evidence for the withdrawn generative cross-validation estimates.}
+
+\rev{Tables~S1 to~S8 of that document report material omitted here for space: the complete architecture and optimiser settings for all three generative models; per-feature Kolmogorov-Smirnov statistics, Jensen-Shannon divergences and Cohen's $d$ for all eleven continuous features across all four synthetic datasets; the full consensus tolerance sweep across eight values; the output-perturbation and DP-SGD privacy sweeps; and the complete subgroup breakdown. Two results there are worth noting. The consensus set records the smallest KS statistics of any method on the hardest biomarkers despite being formally significant on all eleven features, and the VAE has small absolute standardised mean differences despite substantial distributional-shape differences. It is not the closest method on every individual mean-difference measure. These results reinforce the need for multiple quality criteria. The supplementary document and figures are distributed with the code repository.}
+
+\subsection*{Ethics Statement}
+This study used the Mayo Clinic PBC dataset, which is publicly available, fully de-identified, and distributed for research use through the UCI Machine Learning Repository \cite{ucipbc}. No new patient data were collected and no additional ethical approval was required.
+
+\subsection*{Data and Code Availability}
+\rev{The Mayo Clinic PBC dataset is publicly available from the UCI Machine Learning Repository \cite{ucipbc}. The project provides generative-model, filtering, consensus, and evaluation scripts in Python, with TensorFlow 2.15 used for the core neural generators. The fixed split and classifiers use seed 42; the corrected generator rerun uses seeds 42--46 across its five folds. Survival analyses use \texttt{lifelines} and \texttt{scikit-survival}. Reproduction requires the corresponding script sequence and software environment; fixed seeds do not ensure identical results across hardware or thread configurations. Code: \url{https://github.com/Michaeludousoro/liver-cirrhosis-synthetic-data}.}
+
+\subsection*{Declaration of Generative AI Use}
+\rev{The authors used a generative AI assistant for code review, debugging, language editing, and assistance with the evaluation scripts described in this paper. The present editorial revision also used AI assistance for literature discovery, reporting corrections, and preparation of figure code. The authors retain responsibility for verifying the experiments, references, and scientific conclusions before submission.}
+
+% ---------------------------------------------------------------
+% References
+% ---------------------------------------------------------------
+\begingroup
+\revisioncolor
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+\endgroup
+
+

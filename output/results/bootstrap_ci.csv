@@ -1,0 +1,10 @@
+Scenario,Classifier,AUC,CI Lower,CI Upper
+A: Baseline,Random Forest,0.8324,0.7338,0.929
+A: Baseline,Gradient Boosting,0.8297,0.7205,0.9195
+A: Baseline,Logistic Regression,0.8424,0.7438,0.925
+B: Real + cGAN,Random Forest,0.837,0.748,0.917
+B: Real + cGAN,Gradient Boosting,0.8085,0.6924,0.9032
+B: Real + cGAN,Logistic Regression,0.8467,0.7475,0.9257
+C: Real + Consensus,Random Forest,0.8321,0.7271,0.9164
+C: Real + Consensus,Gradient Boosting,0.8176,0.7187,0.904
+C: Real + Consensus,Logistic Regression,0.8461,0.7483,0.9336

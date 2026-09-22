@@ -1,0 +1,18 @@
+{
+  "main": {
+    "pages": 25,
+    "unresolved_references": false
+  },
+  "clean": {
+    "pages": 24,
+    "unresolved_references": false
+  },
+  "supplementary": {
+    "pages": 17,
+    "unresolved_references": false
+  },
+  "supplementary-clean": {
+    "pages": 17,
+    "unresolved_references": false
+  }
+}

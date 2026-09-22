@@ -1,0 +1,46 @@
+\documentclass[manuscript,review,screen,nonacm]{acmart}
+\usepackage{multirow}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{enumitem}
+\graphicspath{{figures/}}
+\acmJournal{JDIQ}
+\setcopyright{none}
+\settopmatter{printacmref=false}
+\hypersetup{hidelinks}
+\pdfstringdefDisableCommands{\def\rev#1{#1}}
+\acmDOI{}
+\acmISBN{}
+\newif\ifshowrevisions
+\ifdefined\cleanversion\showrevisionsfalse\else\showrevisionstrue\fi
+\definecolor{revisionblue}{RGB}{0,55,170}
+\DeclareRobustCommand{\rev}[1]{\ifshowrevisions{\color{revisionblue}#1}\else#1\fi}
+\newcommand{\revisioncolor}{\ifshowrevisions\color{revisionblue}\fi}
+\newcommand{\fitwidth}[1]{\begingroup\sbox0{#1}\ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi\endgroup}
+\begin{document}
+\title[Synthetic Liver Cirrhosis Data: Utility and Quality]{\rev{Evaluating Synthetic Liver Cirrhosis Data: Predictive Utility, Distributional Fidelity, and Consensus-Based Quality Filtering}}
+\author{Michael Udousoro}
+\affiliation{\institution{University of Roehampton}\department{School of Computing, Engineering and the Built Environment}\city{London}\country{United Kingdom}}
+\author{Mohammad Farhan Khan}
+\affiliation{\institution{University of Roehampton}\department{School of Computing, Engineering and the Built Environment}\city{London}\country{United Kingdom}}
+\author{Fakhreldin Saeed}
+\affiliation{\institution{University of Roehampton}\department{School of Computing, Engineering and the Built Environment}\city{London}\country{United Kingdom}}
+\author{M. Mursaleen}
+\authornote{Corresponding author.}
+\email{mursaleenm@gmail.com}
+\affiliation{\institution{China Medical University Hospital, China Medical University}\department{Department of Medical Research}\city{Taichung}\country{Taiwan}}
+\renewcommand{\shortauthors}{Udousoro et al.}
+\begin{abstract}
+\rev{Limited access to complete clinical datasets motivates synthetic data generation, but statistical resemblance alone may not establish predictive value. This study tests the hypothesis that quality-filtered synthetic records improve mortality prediction on held-out real patients with primary biliary cirrhosis. Of 418 Mayo Clinic records, 276 complete cases were divided into 193 training and 83 test patients. Three core models---a generative adversarial network, a conditional GAN (cGAN), and a variational autoencoder---were combined with interquartile-range filtering and cross-model consensus. Additional comparisons included a masked-loss VAE, CTGAN, and SMOTE. Evaluation distinguished distributional fidelity, nearest-neighbour disclosure-risk indicators, and predictive utility under binary classification, three-year classification, and survival modelling. Follow-up duration was excluded from baseline predictors. The masked-loss VAE achieved the lowest tabular Fr\'{e}chet distance (0.062); augmentation increased Random Forest AUC from 0.832 to 0.868, although the paired accuracy comparison was not significant (McNemar $p=0.125$). Synthetic-only cGAN training achieved AUCs of 0.809 and 0.849 for Random Forest and logistic regression, respectively. Consensus filtering produced a 21.1\% near-duplicate rate and did not establish a consistent predictive advantage. Across six synthetic-data methods, the association between fidelity and mean synthetic-only AUC was inconclusive (Pearson $r=0.35$, $p=0.50$). These findings support evaluating synthetic clinical data against its intended task rather than selecting generators by fidelity alone. Fold-contained cross-validation showed no consistent augmentation gain. External cohorts remain necessary to assess generalisability and disclosure risk.}
+\end{abstract}
+\ccsdesc[500]{Computing methodologies~Machine learning}
+\ccsdesc[300]{Applied computing~Health informatics}
+\ccsdesc[300]{Information systems~Data cleaning}
+\keywords{Synthetic clinical data, predictive utility, data quality, liver cirrhosis, generative models, consensus filtering, disclosure risk}
+\maketitle
+\ifshowrevisions
+\noindent\rev{\textbf{Reviewer copy, 17 September 2026.} Blue text identifies revised or added paragraphs, tables, captions, and reformatted references relative to the supplied IEEE manuscript. Unchanged prose remains black. Figures retain their original colours. Historical fold-leaked validation estimates have been replaced by a completed fold-contained rerun.}
+\medskip
+\fi
+\input{content}
+\end{document}

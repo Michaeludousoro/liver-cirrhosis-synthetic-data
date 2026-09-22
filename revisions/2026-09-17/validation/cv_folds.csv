@@ -1,0 +1,61 @@
+Scenario,Classifier,Fold,AUC,Real training N,Validation N,Training N
+A: Baseline,Random Forest,1,0.845108695652174,154,39,154
+A: Baseline,Random Forest,2,0.9347826086956522,154,39,154
+A: Baseline,Random Forest,3,0.8288043478260869,154,39,154
+A: Baseline,Random Forest,4,0.846376811594203,155,38,155
+A: Baseline,Random Forest,5,0.7942028985507247,155,38,155
+A: Baseline,Gradient Boosting,1,0.8586956521739131,154,39,154
+A: Baseline,Gradient Boosting,2,0.9130434782608696,154,39,154
+A: Baseline,Gradient Boosting,3,0.8478260869565217,154,39,154
+A: Baseline,Gradient Boosting,4,0.8057971014492753,155,38,155
+A: Baseline,Gradient Boosting,5,0.7536231884057971,155,38,155
+A: Baseline,Logistic Regression,1,0.8505434782608696,154,39,154
+A: Baseline,Logistic Regression,2,0.9103260869565217,154,39,154
+A: Baseline,Logistic Regression,3,0.8315217391304348,154,39,154
+A: Baseline,Logistic Regression,4,0.7942028985507247,155,38,155
+A: Baseline,Logistic Regression,5,0.7739130434782608,155,38,155
+B: Real + cGAN,Random Forest,1,0.7445652173913043,154,39,424
+B: Real + cGAN,Random Forest,2,0.9184782608695653,154,39,434
+B: Real + cGAN,Random Forest,3,0.811141304347826,154,39,436
+B: Real + cGAN,Random Forest,4,0.8420289855072464,155,38,461
+B: Real + cGAN,Random Forest,5,0.7971014492753623,155,38,431
+B: Real + cGAN,Gradient Boosting,1,0.7581521739130435,154,39,424
+B: Real + cGAN,Gradient Boosting,2,0.9429347826086957,154,39,434
+B: Real + cGAN,Gradient Boosting,3,0.779891304347826,154,39,436
+B: Real + cGAN,Gradient Boosting,4,0.7971014492753624,155,38,461
+B: Real + cGAN,Gradient Boosting,5,0.7623188405797102,155,38,431
+B: Real + cGAN,Logistic Regression,1,0.782608695652174,154,39,424
+B: Real + cGAN,Logistic Regression,2,0.9347826086956521,154,39,434
+B: Real + cGAN,Logistic Regression,3,0.7717391304347826,154,39,436
+B: Real + cGAN,Logistic Regression,4,0.8289855072463769,155,38,461
+B: Real + cGAN,Logistic Regression,5,0.7739130434782608,155,38,431
+C: Real + Consensus,Random Forest,1,0.748641304347826,154,39,898
+C: Real + Consensus,Random Forest,2,0.9673913043478262,154,39,894
+C: Real + Consensus,Random Forest,3,0.8478260869565217,154,39,888
+C: Real + Consensus,Random Forest,4,0.8101449275362319,155,38,986
+C: Real + Consensus,Random Forest,5,0.8144927536231885,155,38,873
+C: Real + Consensus,Gradient Boosting,1,0.7608695652173914,154,39,898
+C: Real + Consensus,Gradient Boosting,2,0.9184782608695652,154,39,894
+C: Real + Consensus,Gradient Boosting,3,0.7880434782608696,154,39,888
+C: Real + Consensus,Gradient Boosting,4,0.808695652173913,155,38,986
+C: Real + Consensus,Gradient Boosting,5,0.7681159420289855,155,38,873
+C: Real + Consensus,Logistic Regression,1,0.7065217391304348,154,39,898
+C: Real + Consensus,Logistic Regression,2,0.7907608695652174,154,39,894
+C: Real + Consensus,Logistic Regression,3,0.8070652173913043,154,39,888
+C: Real + Consensus,Logistic Regression,4,0.8231884057971015,155,38,986
+C: Real + Consensus,Logistic Regression,5,0.7739130434782608,155,38,873
+D: Real + SMOTE,Random Forest,1,0.828804347826087,154,39,184
+D: Real + SMOTE,Random Forest,2,0.9103260869565217,154,39,184
+D: Real + SMOTE,Random Forest,3,0.875,154,39,184
+D: Real + SMOTE,Random Forest,4,0.863768115942029,155,38,184
+D: Real + SMOTE,Random Forest,5,0.8014492753623189,155,38,184
+D: Real + SMOTE,Gradient Boosting,1,0.7989130434782609,154,39,184
+D: Real + SMOTE,Gradient Boosting,2,0.8559782608695652,154,39,184
+D: Real + SMOTE,Gradient Boosting,3,0.8342391304347826,154,39,184
+D: Real + SMOTE,Gradient Boosting,4,0.7913043478260869,155,38,184
+D: Real + SMOTE,Gradient Boosting,5,0.782608695652174,155,38,184
+D: Real + SMOTE,Logistic Regression,1,0.8396739130434783,154,39,184
+D: Real + SMOTE,Logistic Regression,2,0.907608695652174,154,39,184
+D: Real + SMOTE,Logistic Regression,3,0.8260869565217392,154,39,184
+D: Real + SMOTE,Logistic Regression,4,0.7942028985507247,155,38,184
+D: Real + SMOTE,Logistic Regression,5,0.782608695652174,155,38,184

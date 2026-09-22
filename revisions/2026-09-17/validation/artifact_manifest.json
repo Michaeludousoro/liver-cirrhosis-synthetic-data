@@ -1,0 +1,32 @@
+{
+  "python": "3.9.6",
+  "sklearn": "1.5.2",
+  "numpy": "1.26.4",
+  "pandas": "2.3.3",
+  "train_n": 193,
+  "test_n": 83,
+  "exact_overlap": 0,
+  "split_reproduced_from_raw": true,
+  "generators_retrained": true,
+  "test_reconstructed_from_raw_because_cloud_offloaded": true,
+  "scope": "Saved pools verify downstream results, not original generator provenance.",
+  "files": {
+    "data/raw/cirrhosis.csv": "24ae2d5bedbc59898e536b98b152da35bbbb0ed70a2afef0adac8b7c5c8c6d54",
+    "output/data/train_real.csv": "2c8b8cb78238b392cae184de4eea0640976aca301b0df058d61c3c62887daba5",
+    "output/data/filtered_gan.csv": "ddb3ddfadf5d5379e645cebcfd8f76c92f7fbefa1a1ba587a8b6c327ca1f4dc0",
+    "output/data/filtered_ctgan.csv": "d09ca3a9aefedf7a6cb193a9d9f5cd6cd94333bdb08934669888d8bd27b90678",
+    "output/data/filtered_tvae.csv": "be4402755a281082e70297868426a55e7779947fce3d38a925b658978f23941f",
+    "output/data/consensus_equalised.csv": "b3977cb789cccf21e3e8a5b349e393917ca467f78a54b2bf0fb90a1f120205c6",
+    "output/data/filtered_masked_vae.csv": "70f1564aa32a164743937423f712fa412996a6c612e17d056b3803e28e831865",
+    "output/data/filtered_ctgan_proper.csv": "ef7ed90da632780cf656df4d23e5c276fba8bb15024f1075b24adea86436d9ec"
+  },
+  "cv_completed": true,
+  "generator_fits": 15,
+  "tensorflow": "2.15.0",
+  "fold_isolation_audited": true,
+  "code_sha256": {
+    "src/fold_generation.py": "f1d0980c69b29325e17d3748952370e8920eba373c28fff23c1d685e31d76297",
+    "src/statistical_analysis.py": "51babf54110c6d2ded88488196a8d6ed2c9c12e51be1268d99d04ca9d184e9f9",
+    "src/synthetic_generator.py": "6f9662a12b7785bde5209b190d6e4b086bf5dc9c8bc70e1d97d1f973e3726e3b"
+  }
+}
